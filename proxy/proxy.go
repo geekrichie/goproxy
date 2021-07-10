@@ -1,10 +1,9 @@
 package proxy
 
 import (
-	"io"
+	"goproxy/mux"
 	"log"
 	"net"
-	"time"
 )
 
 func checkError(err error) {
@@ -13,28 +12,23 @@ func checkError(err error) {
 	}
 }
 
-func TcpProxy(address string ) {
+func TcpProxy(address string,targetAddrs []string) {
 	var err error
 	listener,err := net.Listen("tcp", address)
 	checkError(err)
 	for{
 		conn,err := listener.Accept()
-		checkError(err)
-		go handleConnection(conn)
+		if err != nil {
+           conn.Close()
+		}
+		connection := mux.NewConn(conn)
+		connection.Target.TargetAddrs = targetAddrs
+		go handleConnection(connection)
 	}
 }
 
-func handleConnection(conn net.Conn) {
-	targetConn , err := net.DialTimeout("tcp","10.220.162.12:13443", 30*time.Second)
-	checkError(err)
-	go func() {
-		//fmt.Println("start copy targetConn to conn")
-		io.Copy(conn, targetConn)
-		//fmt.Println("end copy targetConn to conn")
-	}()
-	go func() {
-		//fmt.Println("start copy conn to targetConn")
-		io.Copy(targetConn, conn)
-		//fmt.Println("end copy conn to targetConn")
-	}()
+
+func handleConnection(conn mux.Connection) {
+	net.DialTimeout()
 }
+
