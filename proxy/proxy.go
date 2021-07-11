@@ -29,6 +29,7 @@ func TcpProxy(address string,targetAddrs []string) {
 
 
 func handleConnection(conn mux.Connection) {
-	net.DialTimeout()
+	targetAddr := conn.Target.GetRandomAddr()
+	conn.SendLinkInfo(targetAddr)
 }
 
