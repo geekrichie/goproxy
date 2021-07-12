@@ -2,11 +2,13 @@ package mux
 
 import (
 	"encoding/binary"
+	"errors"
 	"net"
 	"sync"
 	"sync/atomic"
 )
 
+var errConnectFail = errors.New("connect to the main server failed")
 
 const (
 	TYPE_LINK_INFO = iota
@@ -40,6 +42,48 @@ func (c *Connection) Pack(packetType uint8, info string) (err error) {
 	}
 	err = binary.Write(c.conn, binary.LittleEndian, info)
 	return
+}
+
+func (c *Connection) Read(b []byte) (n int,err error) {
+	return c.conn.Read(b)
+}
+
+func (c *Connection) Write(b []byte) (n int, err error) {
+	return c.conn.Write(b)
+}
+
+func (c *Connection) SendHandShake() error{
+	var (
+		err error
+		n  int
+	)
+	_, err = c.Write([]byte("connect"))
+	if err != nil {
+		return err
+	}
+	var buf = make([]byte, 20)
+	n, err = c.Read(buf)
+	msgConnect := buf[:n]
+	if string(msgConnect) != "connect ok" {
+		return err
+	}
+
+	return nil
+}
+
+func (c *Connection) ReceiveHandShake() error{
+	var (
+		err error
+		n  int
+	)
+	var buf = make([]byte, 20)
+	n, err = c.Read(buf)
+	msgSend := buf[:n]
+	if string(msgSend) != "connect" {
+		return err
+	}
+	_, err = c.Write([]byte("connect ok"))
+	return err
 }
 
 type Target struct {
