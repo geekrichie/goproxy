@@ -19,7 +19,8 @@ func main() {
 
 func run() {
 	if ServerAddr == "" {
-         panic("serveraddr cannot be null")
+		ServerAddr = "127.0.0.1:9999"
+        // panic("serveraddr cannot be null")
 	}
 	client.ConnectServer(ServerAddr)
 }

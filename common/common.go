@@ -4,12 +4,17 @@ import (
 	"gopkg.in/ini.v1"
 	"log"
 	"os"
+	"runtime"
 	"strings"
 )
 
 func GetConfPath() string{
-	path :=  ".."
-	return strings.Join([]string{path, "conf"}, string(os.PathSeparator) )
+	_, fullFilename, _, _ := runtime.Caller(0)
+	lastIndex := strings.LastIndexByte(fullFilename, '/')
+	if runtime.GOOS == "windows" {
+		fullFilename = strings.ReplaceAll(fullFilename[:lastIndex],"/","\\")
+	}
+	return strings.Join([]string{fullFilename,"..", "conf"}, string(os.PathSeparator))
 }
 
 func init() {
@@ -25,8 +30,9 @@ func LoadServerConf() {
 	}
 }
 
-func GetServerPort() string{
-	return serverConf.Section("server").Key("server_port").String()
+func GetServerPort() int{
+	port ,_ := serverConf.Section("server").Key("server_port").Int()
+	return port
 }
 
 

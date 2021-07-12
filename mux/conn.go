@@ -3,12 +3,14 @@ package mux
 import (
 	"encoding/binary"
 	"errors"
+	log "github.com/amoghe/distillog"
 	"net"
 	"sync"
 	"sync/atomic"
 )
 
 var errConnectFail = errors.New("connect to the main server failed")
+var errHandshake  = errors.New("handshake with server failure")
 
 const (
 	TYPE_LINK_INFO = iota
@@ -65,9 +67,9 @@ func (c *Connection) SendHandShake() error{
 	n, err = c.Read(buf)
 	msgConnect := buf[:n]
 	if string(msgConnect) != "connect ok" {
-		return err
+		return errHandshake
 	}
-
+	log.Infof("connect to the server %s ,received %s\n", c.conn.RemoteAddr().String(), string(msgConnect))
 	return nil
 }
 
