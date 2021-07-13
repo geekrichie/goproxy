@@ -2,7 +2,6 @@ package common
 
 import (
 	"gopkg.in/ini.v1"
-	"log"
 	"os"
 	"runtime"
 	"strings"
@@ -40,8 +39,3 @@ func GetSecretKey() string{
 	return serverConf.Section("connect").Key("secretkey").String()
 }
 
-func CheckError(err error) {
-	if err != nil {
-		log.Fatal(err)
-	}
-}
