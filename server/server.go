@@ -3,6 +3,7 @@ package server
 import (
 	"goproxy/log"
 	"goproxy/mux/mux_link"
+	"goproxy/mux/mux_msg"
 	"goproxy/mux/mux_net"
 	"net"
 	"time"
@@ -12,12 +13,12 @@ type Server struct {
 	cm mux_net.ConnManager
 	address string
 }
-var server Server
+var defaultServer Server
 
 
 func StartServer(address string) {
 	var err error
-	server.address = address
+	defaultServer.address = address
 	listener,err := net.Listen("tcp", address)
 	if err != nil {
 		panic(err)
@@ -29,6 +30,7 @@ func StartServer(address string) {
 		}
 		log.Infof("client : %s connect to the server\n",conn.RemoteAddr().String())
 		connection := mux_net.NewConn(conn)
+		defaultServer.cm.AddConnection(connection)
 		go handleConnection(connection)
 	}
 }
@@ -47,11 +49,14 @@ func handleConnection(conn mux_net.Connection) {
 		return
 	}
 	mode := modebyte[0]
+	//设置连接类型
+	conn.SetConnType(int(mode))
 	switch mode{
 		case mux_link.MainMode:
 			tcpconn := conn.GetConn().(*net.TCPConn)
 			tcpconn.SetKeepAlive(true)
 			tcpconn.SetKeepAlivePeriod(5*time.Second)
+			conn.SendMsg(mux_msg.MSG_LOG_INFO, "this is a first logging message")
 
 
 	}

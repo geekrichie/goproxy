@@ -13,10 +13,10 @@ import (
 
 
 func ConnectServer(ServerAddr string) {
-	startServer(ServerAddr, mux_link.MainMode)
+	startConnect(ServerAddr, mux_link.MainMode)
 }
 
-func startServer(addr string, mode int) {
+func startConnect(addr string, mode uint8) {
 	conn, err := net.DialTimeout("tcp", addr, 60*time.Second)
 	if err != nil {
 		log.Error(err.Error())
@@ -52,7 +52,7 @@ func handleMainConnect(conn mux_net.Connection) {
 			return
 		}
 		switch msgType{
-			case mux_msg.MSG_INFO:
+			case mux_msg.MSG_LOG_INFO:
 			    handleInfoMsg(conn)
 		}
 
