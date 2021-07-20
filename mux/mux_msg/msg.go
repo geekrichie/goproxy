@@ -14,7 +14,7 @@ const (
 
 type MsgInfo struct {
 	msgType uint8
-	messagelen int
+	messagelen int32
 	message string
 }
 
@@ -24,18 +24,21 @@ var syncMsgInfoPool = sync.Pool{
 	},
 }
 
-func pack(msgType uint8, message string) []byte{
+func Pack(msgType uint8, message string) []byte{
 	msgInfo := syncMsgInfoPool.Get().(MsgInfo)
 	msgInfo.msgType = msgType
-	msgInfo.messagelen = len(message)
+	msgInfo.messagelen = int32(len(message))
 	msgInfo.message = message
 	var buf bytes.Buffer
-	binary.Write(&buf,binary.LittleEndian, &msgInfo)
+	binary.Write(&buf, binary.LittleEndian,msgInfo.msgType)
+	binary.Write(&buf, binary.LittleEndian,msgInfo.messagelen)
+	buf.Write([]byte(msgInfo.message))
 	syncMsgInfoPool.Put(msgInfo)
 	return buf.Bytes()
 }
 
-func unpack(msg []byte) MsgInfo{
+
+func Unpack(msg []byte) MsgInfo{
 	msgInfo := *(*MsgInfo)(unsafe.Pointer(&msg))
 	return msgInfo
 }

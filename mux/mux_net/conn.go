@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"goproxy/common"
 	"goproxy/log"
+	"goproxy/mux/mux_msg"
 	"io"
 	"net"
 	"sync"
@@ -81,7 +82,7 @@ func (c *Connection) SendHandShake() error{
 		return err
 	}
 	msgConnect,err := c.ReadSmallMsg()
-	if err != nil || string(msgConnect) != "connect ok" {
+	if err != nil || string(msgConnect) != "connected" {
 		if err != nil{
 			return err
 		}
@@ -123,7 +124,7 @@ func (c *Connection) ReceiveHandShake() error{
 		}
 		return errors.New(fmt.Sprintf("client: %s wrong connect msg", c.conn.RemoteAddr().String()))
 	}
-	_, err = c.Write([]byte("connect ok"))
+	_, err = c.Write([]byte("connected"))
 	if err != nil {
 		return err
 	}
@@ -154,9 +155,9 @@ func (c *Connection) ReadLenContent() ([]byte, error){
 }
 
 func (c *Connection) ReadLen() (int,error){
-	var l int
+	var l int32
 	err := binary.Read(c, binary.LittleEndian, &l)
-	return l, err
+	return int(l), err
 }
 
 func (c *Connection) ReadMsgType() (uint8,error){
@@ -173,6 +174,14 @@ func (c *Connection) ReadContent(contentSize int)([]byte,error) {
 
 func (c *Connection) GetConn() net.Conn{
 	return c.conn
+}
+
+func (c *Connection) SendMsg(msgType uint8, message string) {
+	packedMessage := mux_msg.Pack(msgType, message)
+	_, err := c.Write(packedMessage)
+	if err != nil {
+		log.Error(err.Error())
+	}
 }
 
 type Target struct {

@@ -44,6 +44,7 @@ func handleConnection(conn mux_net.Connection) {
 		log.Info("handshake finished!")
 	}
 	modebyte, err := conn.ReadContent(1)
+	log.Infof("client: %s mode : %d", conn.GetConn().RemoteAddr().String(), modebyte)
 	if err != nil {
 		conn.Close()
 		return
@@ -53,10 +54,12 @@ func handleConnection(conn mux_net.Connection) {
 	conn.SetConnType(int(mode))
 	switch mode{
 		case mux_link.MainMode:
-			tcpconn := conn.GetConn().(*net.TCPConn)
-			tcpconn.SetKeepAlive(true)
-			tcpconn.SetKeepAlivePeriod(5*time.Second)
+			//tcpconn := conn.GetConn().(*net.TCPConn)
+			//tcpconn.SetKeepAlive(true)
+			//tcpconn.SetKeepAlivePeriod(5*time.Second)
 			conn.SendMsg(mux_msg.MSG_LOG_INFO, "this is a first logging message")
+			time.Sleep(10)
+			conn.SendMsg(mux_msg.MSG_LOG_INFO, "this is second message")
 
 
 	}

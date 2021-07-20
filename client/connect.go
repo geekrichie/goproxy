@@ -1,11 +1,12 @@
 package client
 
 import (
+	"fmt"
 	"goproxy/log"
 	"goproxy/mux/mux_link"
 	"goproxy/mux/mux_msg"
-	"net"
 	"goproxy/mux/mux_net"
+	"net"
 	"time"
 )
 
@@ -31,7 +32,7 @@ func startConnect(addr string, mode uint8) {
 	}
 	switch mode{
 	case mux_link.MainMode:
-		go handleMainConnect(newConn)
+		 handleMainConnect(newConn)
 	case mux_link.TranMode:
 		go handleTranConnect(newConn)
 
@@ -62,6 +63,7 @@ func handleMainConnect(conn mux_net.Connection) {
 func handleInfoMsg(conn mux_net.Connection) {
 	content, err := conn.ReadLenContent()
 	if err != nil {
+		fmt.Println(err)
 		return
 	}
 	log.Info(string(content))
