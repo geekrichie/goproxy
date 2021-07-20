@@ -1,12 +1,13 @@
 package server
 
 import (
+	"goproxy/file"
 	"goproxy/log"
 	"goproxy/mux/mux_link"
 	"goproxy/mux/mux_msg"
 	"goproxy/mux/mux_net"
 	"net"
-	"time"
+	"strconv"
 )
 
 type Server struct {
@@ -58,8 +59,9 @@ func handleConnection(conn mux_net.Connection) {
 			//tcpconn.SetKeepAlive(true)
 			//tcpconn.SetKeepAlivePeriod(5*time.Second)
 			conn.SendMsg(mux_msg.MSG_LOG_INFO, "this is a first logging message")
-			time.Sleep(10)
 			conn.SendMsg(mux_msg.MSG_LOG_INFO, "this is second message")
+		case mux_link.TranMode:
+			transConn()
 
 
 	}
@@ -67,3 +69,31 @@ func handleConnection(conn mux_net.Connection) {
 	//conn.SendLinkInfo(targetAddr)
 }
 
+func transConn(conn mux_net.Connection) {
+
+	taskDb := file.LoadTask()
+	for _, task := range taskDb.Tasks {
+		conn.Target.TargetAddrs = task.TargetAddrs
+		go listenOuterConn(task)
+		targetAddr := conn.Target.GetRandomAddr()
+		conn.SendLinkInfo(targetAddr)
+		break
+	}
+
+}
+
+func listenOuterConn (task file.Task) {
+	l, err := net.Listen("tcp", ":"+strconv.Itoa(task.Port))
+	if err != nil {
+		log.Error(err.Error())
+		return
+	}
+	for {
+		netconn, err  := l.Accept()
+		if  err != nil {
+			log.Error(err.Error())
+			netconn.Close()
+		}
+
+	}
+}

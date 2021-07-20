@@ -14,6 +14,7 @@ import (
 
 
 func ConnectServer(ServerAddr string) {
+	go startConnect(ServerAddr, mux_link.TranMode)
 	startConnect(ServerAddr, mux_link.MainMode)
 }
 
@@ -41,7 +42,10 @@ func startConnect(addr string, mode uint8) {
 }
 
 func handleTranConnect(conn mux_net.Connection) {
-	
+	conn.SendMode(mux_link.TranMode)
+	for {
+		link_info := conn.ReadLinkInfo()
+	}
 }
 
 func handleMainConnect(conn mux_net.Connection) {

@@ -17,9 +17,7 @@ var errConnectFail = errors.New("connect to the main server failed")
 var errHandshake  = errors.New("handshake with server failure")
 var errSecretkey = errors.New("key error")
 
-const (
-	TYPE_LINK_INFO = iota
-)
+
 
 type Connection struct {
 	conn     net.Conn
@@ -41,21 +39,11 @@ func (c *Connection) SetConnType(connType int) {
 
 func (c *Connection) SendLinkInfo(targetaddr string)error {
 	//这里1个字节的类型标识，4个字节的长度，后面接具体的连接信息
-	return c.Pack(TYPE_LINK_INFO, targetaddr)
+	data := mux_msg.Pack(mux_msg.MSG_LINK_INFO, targetaddr)
+	_, err := c.Write(data)
+	return err
 }
 
-func (c *Connection) Pack(packetType uint8, info string) (err error) {
-	err = binary.Write(c.conn, binary.LittleEndian, packetType)
-	if err != nil {
-		return
-	}
-	err = binary.Write(c.conn, binary.LittleEndian, len(info))
-	if err != nil {
-		return
-	}
-	err = binary.Write(c.conn, binary.LittleEndian, info)
-	return
-}
 
 func (c *Connection) Read(b []byte) (n int,err error) {
 	return c.conn.Read(b)
@@ -177,6 +165,12 @@ func (c *Connection) GetConn() net.Conn{
 }
 
 func (c *Connection) SendMsg(msgType uint8, message string) {
+	//这里的发送消息格式是
+	//-------------------------------
+	//| msgType | msglen |   msg   |
+	//-------------------------------
+	//| 1byte   | 4byte  | msglen值 |
+	//-------------------------------
 	packedMessage := mux_msg.Pack(msgType, message)
 	_, err := c.Write(packedMessage)
 	if err != nil {

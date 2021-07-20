@@ -15,7 +15,7 @@ func init(){
 
 func main() {
 	flag.Parse()
-	if ServerPort ==0 {
+	if ServerPort == 0 {
 		ServerPort  = common.GetServerPort()
 	}
 	server.StartServer(":"+strconv.Itoa(ServerPort))
