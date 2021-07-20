@@ -44,7 +44,20 @@ func startConnect(addr string, mode uint8) {
 func handleTranConnect(conn mux_net.Connection) {
 	conn.SendMode(mux_link.TranMode)
 	for {
-		link_info := conn.ReadLinkInfo()
+		msgType ,err := conn.ReadMsgType()
+		if err != nil {
+			conn.Close()
+			return
+		}
+		switch msgType{
+		case mux_msg.MSG_LINK_INFO:
+			addr, err := conn.ReadLenContent()
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+			log.Info(string(addr))
+		}
 	}
 }
 

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"goproxy/file"
 	"goproxy/log"
 	"goproxy/mux/mux_link"
@@ -61,7 +62,7 @@ func handleConnection(conn mux_net.Connection) {
 			conn.SendMsg(mux_msg.MSG_LOG_INFO, "this is a first logging message")
 			conn.SendMsg(mux_msg.MSG_LOG_INFO, "this is second message")
 		case mux_link.TranMode:
-			transConn()
+			transConn(conn)
 
 
 	}
@@ -84,6 +85,7 @@ func transConn(conn mux_net.Connection) {
 
 func listenOuterConn (task file.Task) {
 	l, err := net.Listen("tcp", ":"+strconv.Itoa(task.Port))
+	log.Info(fmt.Sprintf("New Task Listen port : %d", task.Port))
 	if err != nil {
 		log.Error(err.Error())
 		return

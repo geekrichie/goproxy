@@ -37,11 +37,9 @@ func (c *Connection) SetConnType(connType int) {
 	c.ConnType = connType
 }
 
-func (c *Connection) SendLinkInfo(targetaddr string)error {
+func (c *Connection) SendLinkInfo(targetaddr string) {
 	//这里1个字节的类型标识，4个字节的长度，后面接具体的连接信息
-	data := mux_msg.Pack(mux_msg.MSG_LINK_INFO, targetaddr)
-	_, err := c.Write(data)
-	return err
+	c.SendMsg(mux_msg.MSG_LINK_INFO, targetaddr)
 }
 
 
