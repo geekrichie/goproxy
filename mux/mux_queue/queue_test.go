@@ -38,3 +38,19 @@ func TestLKQueue_Enqueue(t *testing.T) {
 	}
 }
 
+
+type ListElement struct{
+	buf    []byte
+	L      int
+	isPart bool
+}
+func TestQueue(t *testing.T) {
+	bufQueue := NewLKQueue()
+	b := []byte("123")
+	listelem := new(ListElement)
+	listelem.buf = b
+	listelem.L = len(b)
+	bufQueue.Enqueue(listelem)
+	r := bufQueue.Dequeue()
+	fmt.Println(r)
+}
