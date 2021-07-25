@@ -3,6 +3,7 @@ package mux_link
 import (
 	"goproxy/mux/mux_queue"
 	"net"
+	"runtime"
 	"sync"
 )
 
@@ -60,19 +61,31 @@ func (c *conn) GetConnId() int{
 
 type receiveWindow struct {
 	bufQueue *mux_queue.LKQueue
-	queueSize int
+	windowSize  int
+	maxWindowsize int
 }
 
 func NewReceiveWindow() *receiveWindow{
 	 return &receiveWindow{
            bufQueue: mux_queue.NewLKQueue(),
-           queueSize: 0,
+           windowSize: 0,
+           maxWindowsize: MaxReceiveWindowSize,
 	 }
 }
 
-func (rw *receiveWindow) Write(b []byte) {
+func (rw *receiveWindow) Write(b []byte)(n int, err error) {
+	//如果超出最大窗口大小，那么先阻塞
+	if rw.windowSize + len(b) > MaxReceiveWindowSize{
+		runtime.Gosched()
+	}
 	rw.bufQueue.Enqueue(b)
+	rw.windowSize += len(b)
+	return
+}
 
+func (rw *receiveWindow) Read(b []byte)(n int, err error)  {
+
+	return
 }
 
 
