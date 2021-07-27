@@ -42,6 +42,7 @@ func handleConnection(conn mux_net.Connection) {
 	err := conn.ReceiveHandShake()
 	if err != nil {
 		log.Error(err.Error())
+		conn.Close()
 	}else{
 		log.Info("handshake finished!")
 	}
@@ -73,17 +74,21 @@ func handleConnection(conn mux_net.Connection) {
 func transConn(conn mux_net.Connection) {
 
 	taskDb := file.LoadTask()
+	plexer := mux_link.NewMultiPlexer(conn.GetConn())
 	for _, task := range taskDb.Tasks {
 		conn.Target.TargetAddrs = task.TargetAddrs
-		go listenOuterConn(task)
 		targetAddr := conn.Target.GetRandomAddr()
-		conn.SendLinkInfo(targetAddr)
+		go listenOuterConn(task,targetAddr , plexer)
+		//TCP分离产生的连接，不是真的网络连接
+		//secondConn := mux_link.NewConn(*plexer)
+		//plexer.AddConn(secondConn)
+		//conn.SendLinkInfo(targetAddr)
 		break
 	}
 
 }
 
-func listenOuterConn (task file.Task) {
+func listenOuterConn (task file.Task,targetAddr string, plexer *mux_link.MultiPlexer) {
 	l, err := net.Listen("tcp", ":"+strconv.Itoa(task.Port))
 	log.Info(fmt.Sprintf("New Task Listen port : %d", task.Port))
 	if err != nil {
@@ -92,10 +97,14 @@ func listenOuterConn (task file.Task) {
 	}
 	for {
 		netconn, err  := l.Accept()
+		log.Infof("client %s connect to the port %d", netconn.RemoteAddr().String(), task.Port)
 		if  err != nil {
 			log.Error(err.Error())
 			netconn.Close()
 		}
-
+		linkconn := mux_link.NewConn(plexer)
+		plexer.AddConn(linkconn)
+		linkconn.SendLinkInfo(targetAddr)
+		mux_link.Copy(netconn, &linkconn)
 	}
 }

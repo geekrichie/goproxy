@@ -11,7 +11,6 @@ func TestReceiveWindow_Read(t *testing.T) {
 	rw := NewReceiveWindow()
 	var b = make([]byte, 10)
 	go func() {
-		time.Sleep(1*time.Second)
 		n, err := rw.Write([]byte("abcde"))
 		if err != nil {
 			t.Error(err)
@@ -24,6 +23,7 @@ func TestReceiveWindow_Read(t *testing.T) {
 		}
 		t.Logf("write %d byte\n", n)
 	}()
+	time.Sleep(1*time.Second)
 	n, err := rw.Read(b)
 	if err != nil {
 		t.Error(err)
@@ -38,4 +38,8 @@ func TestReceiveWindow_Read(t *testing.T) {
 	}
 	t.Log(n)
 	fmt.Printf("%#v\n", c)
+}
+
+func TestSlice(t *testing.T) {
+
 }

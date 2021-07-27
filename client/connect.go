@@ -1,11 +1,13 @@
 package client
 
 import (
+	"encoding/binary"
 	"fmt"
 	"goproxy/log"
 	"goproxy/mux/mux_link"
 	"goproxy/mux/mux_msg"
 	"goproxy/mux/mux_net"
+	"io"
 	"net"
 	"time"
 )
@@ -43,6 +45,7 @@ func startConnect(addr string, mode uint8) {
 
 func handleTranConnect(conn mux_net.Connection) {
 	conn.SendMode(mux_link.TranMode)
+	conn.Plexer  = mux_link.NewMultiPlexer(conn.GetConn())
 	for {
 		msgType ,err := conn.ReadMsgType()
 		if err != nil {
@@ -51,15 +54,38 @@ func handleTranConnect(conn mux_net.Connection) {
 		}
 		switch msgType{
 		case mux_msg.MSG_LINK_INFO:
-			addr, err := conn.ReadLenContent()
-			if err != nil {
-				fmt.Println(err)
-				return
-			}
-			log.Info(string(addr))
+			log.Info("accept msg_link_info")
+			dealNewConn(conn)
 		}
 	}
 }
+
+
+func dealNewConn(conn mux_net.Connection) {
+
+	linkConn := mux_link.NewConn(conn.Plexer)
+	var buf = make([]byte, 4)
+	io.ReadFull(&conn, buf)
+	var connId uint32
+	connId = binary.LittleEndian.Uint32(buf)
+	linkConn.SetConnId(int(connId))
+	log.Infof("New conn Id : %d", connId)
+	conn.Plexer.AddConn(linkConn)
+	io.ReadFull(&conn, buf)
+	var messagelen uint32
+	messagelen = binary.LittleEndian.Uint32(buf)
+	log.Infof("New messagelen : %d", messagelen)
+	var linkinfo = make([]byte, messagelen)
+	io.ReadFull(&conn, linkinfo)
+	c, err := net.DialTimeout("tcp", string(linkinfo), time.Millisecond*200)
+	if err != nil {
+		log.Errorf("dial %s error", string(linkinfo))
+	}
+
+	mux_link.Copy(c, &linkConn)
+
+}
+
 
 func handleMainConnect(conn mux_net.Connection) {
 	conn.SendMode(mux_link.MainMode)

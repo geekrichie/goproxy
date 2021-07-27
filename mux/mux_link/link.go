@@ -1,6 +1,8 @@
 package mux_link
 
 import (
+	"goproxy/log"
+	"goproxy/mux/mux_msg"
 	"goproxy/mux/mux_queue"
 	"net"
 	"sync"
@@ -18,21 +20,36 @@ const (
 
 type MultiPlexer struct {
 	connNum int
-	conns []conn
+	conns  map[int]conn
 	L sync.Mutex
 	netconn net.Conn
 }
 
 type conn struct {
 	connId int
-	readWindow receiveWindow
+	plexer MultiPlexer
+	receiveWindow receiveWindow
 	sendWindow sendWindow
 }
 
-func NewMultiPlexer() *MultiPlexer {
+func (c *conn) SetDeadline(t time.Time) error {
+	return c.plexer.netconn.SetDeadline(t)
+}
+
+func (c *conn) SetReadDeadline(t time.Time) error {
+	return c.plexer.netconn.SetReadDeadline(t)
+}
+
+func (c *conn) SetWriteDeadline(t time.Time) error {
+	return c.plexer.netconn.SetWriteDeadline(t)
+}
+
+func NewMultiPlexer(netconn net.Conn) *MultiPlexer {
 	return &MultiPlexer{
 		connNum: 0,
-		conns : make([]conn,0),
+		conns : make(map[int]conn),
+		netconn: netconn,
+		L : sync.Mutex{},
 	}
 }
 
@@ -40,37 +57,112 @@ func (m MultiPlexer) AddConn(conn conn) {
 	m.L.Lock()
 	defer m.L.Unlock()
 	conn.connId = m.connNum
+	conn.plexer = m
 	m.connNum  = m.connNum + 1
-	m.conns = append(m.conns, conn)
+	m.conns[conn.connId] = conn
 }
 
+func NewConn(plexer *MultiPlexer) conn{
+	return conn{
+		receiveWindow: *NewReceiveWindow(),
+		sendWindow: sendWindow{plexer: plexer},
+	}
+}
 
+func (c *conn) SendLinkInfo(targetaddr string) {
+	//这里1个字节的类型标识，4个字节的长度，后面接具体的连接信息
+	msgConnInfo := mux_msg.SyncMsgConnInfoPool.Get().(*mux_msg.MsgConnInfo)
+	msgConnInfo.SetMessage(mux_msg.MSG_LINK_INFO, int32(c.connId), targetaddr)
+	buf, err := msgConnInfo.Pack()
+	if err != nil {
+		log.Error(err.Error())
+	}
+	_, err = c.Write(buf)
+	if err != nil {
+		log.Error(err.Error())
+	}
+}
+
+func (c *conn)AcceptLink() {
+	//buf := make([]byte, 4)
+	//_, _ = io.ReadFull(c,buf)
+	//var connId uint32
+	//binary.LittleEndian.PutUint32(buf, connId)
+	//c.connId = int(connId)
+	//_, _ = io.ReadFull(c,buf)
+
+}
+
+func Copy(c1 , c2 net.Conn) {
+	buf := make([]byte,32*1024)
+	go func() {
+		for {
+			n1, err1 := c1.Read(buf)
+			if err1 != nil {
+				c2.Write(buf[:n1])
+			}else {
+				log.Error(err1.Error())
+				break
+			}
+		}
+	}()
+	go func() {
+		for {
+			n2, err2 := c2.Read(buf)
+			if err2 != nil {
+				c1.Write(buf[:n2])
+			} else {
+				log.Error(err2.Error())
+				break
+			}
+		}
+	}()
+}
 
 
 func (c *conn) GetConnId() int{
 	return c.connId
 }
-//
-//func (c *conn) Write([]byte) int {
-//
-//}
-//
-//func (c *conn) Read([]byte) {
-//
-//}
+
+func (c *conn) SetConnId(connId int) {
+	c.connId = connId
+}
+
+func (c *conn) Write(data []byte) (n int, err error) {
+   return  c.sendWindow.Write(data, c.connId)
+}
+
+func (c *conn) Read(data []byte) (n int, err error) {
+    return c.receiveWindow.Read(data)
+}
+func (c *conn) Close() error {
+	//todo 关闭连接
+	return nil
+}
+
+// LocalAddr returns the local network address.
+func (c *conn) LocalAddr() net.Addr {
+	return c.plexer.netconn.LocalAddr()
+}
+
+// RemoteAddr returns the remote network address.
+func (c *conn) RemoteAddr() net.Addr {
+	return c.plexer.netconn.RemoteAddr()
+}
 
 type receiveWindow struct {
-	bufQueue *mux_queue.LKQueue
+	bufQueue *mux_queue.Queue
 	curElem *ListElement
 	//当前读取List的偏移量
 	off int
 	windowSize  int
 	maxWindowsize int
+	plexer MultiPlexer
 }
 
 func NewReceiveWindow() *receiveWindow{
 	 return &receiveWindow{
-           bufQueue: mux_queue.NewLKQueue(),
+           bufQueue: mux_queue.NewQueue(),
            curElem : new(ListElement),
            windowSize: 0,
            maxWindowsize: MaxReceiveWindowSize,
@@ -89,7 +181,7 @@ func (rw *receiveWindow) Write(b []byte)(n int, err error) {
 	listelem := syncListPool.Get().(*ListElement)
 	listelem.Buf = b
 	listelem.L = len(b)
-	rw.bufQueue.Enqueue(listelem)
+	rw.bufQueue.Push(listelem)
 
 	return len(b), nil
 }
@@ -108,7 +200,8 @@ var syncListPool = sync.Pool{
 
 func (rw *receiveWindow) Read(b []byte)(int, error)  {
 	var n int
-	startRead:
+	var s interface{}
+	var err error
 	off := 0
 	if rw.curElem.L > rw.off {
 		n = copy(b,rw.curElem.Buf[rw.off:rw.curElem.L])
@@ -119,11 +212,10 @@ func (rw *receiveWindow) Read(b []byte)(int, error)  {
 		return n, nil
 	}
 	for {
-		s := rw.bufQueue.Dequeue()
-		if s == nil{
-			time.Sleep(1*time.Millisecond)
-			goto startRead
+		if rw.bufQueue.Len == 0 {
+			break
 		}
+		s,err = rw.bufQueue.Pop()
 		elem := s.(*ListElement)
 		//off表示已经读取的长度，如果当前元素的长度大于要读取的长度
 
@@ -135,12 +227,16 @@ func (rw *receiveWindow) Read(b []byte)(int, error)  {
 			break
 		}
 	}
-	rw.windowSize -= len(b)
-	return len(b), nil
+	rw.windowSize -= off
+	return off, err
 }
 
 
 type sendWindow struct {
-
+	plexer *MultiPlexer
 }
 
+
+func (s *sendWindow) Write(data []byte, connId int)(n int, err error) {
+	return s.plexer.netconn.Write(data)
+}

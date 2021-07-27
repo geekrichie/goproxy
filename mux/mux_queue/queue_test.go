@@ -2,6 +2,7 @@ package mux_queue
 
 import (
 	"fmt"
+	"log"
 	"sync"
 	"testing"
 )
@@ -53,4 +54,19 @@ func TestQueue(t *testing.T) {
 	bufQueue.Enqueue(listelem)
 	r := bufQueue.Dequeue()
 	fmt.Println(r)
+}
+
+
+func TestNewQueue(t *testing.T) {
+	var queue = NewQueue()
+	queue.Push("12345")
+	queue.Push(12344)
+	for {
+		v,err := queue.Pop()
+		if err != nil{
+			break
+		}
+		log.Print(v)
+		log.Printf(" queue size = %d \n", queue.len)
+	}
 }

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"sync"
-	"unsafe"
 )
 
 const (
@@ -19,27 +18,64 @@ type MsgInfo struct {
 	message string
 }
 
-var syncMsgInfoPool = sync.Pool{
+var SyncMsgInfoPool = sync.Pool{
 	New:func() interface{} {
-		return MsgInfo{}
+		return &MsgInfo{}
 	},
 }
 
-func Pack(msgType uint8, message string) []byte{
-	msgInfo := syncMsgInfoPool.Get().(MsgInfo)
-	msgInfo.msgType = msgType
-	msgInfo.messagelen = int32(len(message))
-	msgInfo.message = message
+func (m *MsgInfo) SetMessage(msgType uint8, message string) {
+	 m.msgType = msgType
+	 m.messagelen = int32(len(message))
+	 m.message = message
+}
+
+func (m *MsgInfo)Pack() []byte{
 	var buf bytes.Buffer
-	binary.Write(&buf, binary.LittleEndian,msgInfo.msgType)
-	binary.Write(&buf, binary.LittleEndian,msgInfo.messagelen)
-	buf.Write([]byte(msgInfo.message))
-	syncMsgInfoPool.Put(msgInfo)
+	binary.Write(&buf, binary.LittleEndian,m.msgType)
+	binary.Write(&buf, binary.LittleEndian,m.messagelen)
+	buf.Write([]byte(m.message))
+	SyncMsgInfoPool.Put(m)
 	return buf.Bytes()
 }
 
 
-func Unpack(msg []byte) MsgInfo{
-	msgInfo := *(*MsgInfo)(unsafe.Pointer(&msg))
-	return msgInfo
+
+type MsgConnInfo struct {
+	msgType uint8
+	connId  int32
+	messagelen int32
+	message string
 }
+
+var SyncMsgConnInfoPool = sync.Pool{
+	New:func() interface{} {
+		return &MsgConnInfo{}
+	},
+}
+
+func (m *MsgConnInfo) SetMessage(msgType uint8,connId int32, message string) {
+	m.msgType = msgType
+	m.connId = connId
+	m.messagelen = int32(len(message))
+	m.message = message
+}
+
+func (m *MsgConnInfo)Pack() ([]byte, error ){
+    var buf bytes.Buffer
+    err := binary.Write(&buf, binary.LittleEndian, m.msgType)
+    if err != nil{
+    	return nil,err
+	}
+	err = binary.Write(&buf, binary.LittleEndian, m.connId)
+	if err != nil{
+		return nil,err
+	}
+	err = binary.Write(&buf, binary.LittleEndian, m.messagelen)
+	if err != nil{
+		return nil,err
+	}
+	buf.Write([]byte(m.message))
+	return buf.Bytes(), nil
+}
+

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"goproxy/common"
 	"goproxy/log"
+	"goproxy/mux/mux_link"
 	"goproxy/mux/mux_msg"
 	"io"
 	"net"
@@ -24,6 +25,7 @@ type Connection struct {
 	Target   Target
 	ConnType int
 	Id       int
+	Plexer   *mux_link.MultiPlexer
 }
 
 
@@ -169,7 +171,9 @@ func (c *Connection) SendMsg(msgType uint8, message string) {
 	//-------------------------------
 	//| 1byte   | 4byte  | msglen值 |
 	//-------------------------------
-	packedMessage := mux_msg.Pack(msgType, message)
+	msgInfo := mux_msg.SyncMsgInfoPool.Get().(*mux_msg.MsgInfo)
+	msgInfo.SetMessage(msgType, message)
+	packedMessage := msgInfo.Pack()
 	_, err := c.Write(packedMessage)
 	if err != nil {
 		log.Error(err.Error())
