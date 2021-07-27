@@ -79,10 +79,6 @@ func transConn(conn mux_net.Connection) {
 		conn.Target.TargetAddrs = task.TargetAddrs
 		targetAddr := conn.Target.GetRandomAddr()
 		go listenOuterConn(task,targetAddr , plexer)
-		//TCP分离产生的连接，不是真的网络连接
-		//secondConn := mux_link.NewConn(*plexer)
-		//plexer.AddConn(secondConn)
-		//conn.SendLinkInfo(targetAddr)
 		break
 	}
 
@@ -103,7 +99,8 @@ func listenOuterConn (task file.Task,targetAddr string, plexer *mux_link.MultiPl
 			netconn.Close()
 		}
 		linkconn := mux_link.NewConn(plexer)
-		plexer.AddConn(linkconn)
+		plexer.AddConn(&linkconn)
+		fmt.Println(linkconn)
 		linkconn.SendLinkInfo(targetAddr)
 		mux_link.Copy(netconn, &linkconn)
 	}

@@ -55,14 +55,32 @@ func handleTranConnect(conn mux_net.Connection) {
 		switch msgType{
 		case mux_msg.MSG_LINK_INFO:
 			log.Info("accept msg_link_info")
-			dealNewConn(conn)
+			dealNewTaskConn(conn)
+		case mux_msg.MSG_TRAN_INFO:
+			log.Info("accept msg_tran_info")
+			Unpack(conn)
 		}
 	}
 }
 
+func Unpack(conn mux_net.Connection) {
+	var buf = make([]byte, 4)
+	io.ReadFull(&conn, buf)
+	var connId uint32
+	connId = binary.LittleEndian.Uint32(buf)
+	linkConn := conn.Plexer.GetConnById(int(connId))
+	io.ReadFull(&conn, buf)
+	var messagelen uint32
+	messagelen = binary.LittleEndian.Uint32(buf)
+	log.Infof("New messagelen : %d", messagelen)
+	var message = make([]byte, messagelen)
+	io.ReadFull(&conn, message)
+	linkConn.ReceiveWindowWrite(message)
+	return
+}
 
-func dealNewConn(conn mux_net.Connection) {
 
+func dealNewTaskConn(conn mux_net.Connection) {
 	linkConn := mux_link.NewConn(conn.Plexer)
 	var buf = make([]byte, 4)
 	io.ReadFull(&conn, buf)
@@ -70,13 +88,15 @@ func dealNewConn(conn mux_net.Connection) {
 	connId = binary.LittleEndian.Uint32(buf)
 	linkConn.SetConnId(int(connId))
 	log.Infof("New conn Id : %d", connId)
-	conn.Plexer.AddConn(linkConn)
+	conn.Plexer.AddConn(&linkConn)
+
 	io.ReadFull(&conn, buf)
 	var messagelen uint32
 	messagelen = binary.LittleEndian.Uint32(buf)
 	log.Infof("New messagelen : %d", messagelen)
 	var linkinfo = make([]byte, messagelen)
 	io.ReadFull(&conn, linkinfo)
+	fmt.Printf("%#v", linkConn)
 	c, err := net.DialTimeout("tcp", string(linkinfo), time.Millisecond*200)
 	if err != nil {
 		log.Errorf("dial %s error", string(linkinfo))

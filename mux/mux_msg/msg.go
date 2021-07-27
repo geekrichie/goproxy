@@ -10,6 +10,7 @@ const (
 	MSG_PING uint8 = iota
 	MSG_LOG_INFO
 	MSG_LINK_INFO
+	MSG_TRAN_INFO
 )
 
 type MsgInfo struct {
