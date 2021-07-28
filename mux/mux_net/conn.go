@@ -10,7 +10,6 @@ import (
 	"goproxy/mux/mux_msg"
 	"io"
 	"net"
-	"sync"
 	"sync/atomic"
 )
 
@@ -22,7 +21,6 @@ var errSecretkey = errors.New("key error")
 
 type Connection struct {
 	conn     net.Conn
-	Target   Target
 	ConnType int
 	Id       int
 	Plexer   *mux_link.MultiPlexer
@@ -180,13 +178,19 @@ func (c *Connection) SendMsg(msgType uint8, message string) {
 	}
 }
 
+/**
+ kafka-go balance.go 中的轮询实现
+ */
+
 type Target struct {
-	index int64
-	lock sync.Locker
+	offset uint32
 	TargetAddrs []string //tcp代理访问的目标地址
 }
 
+
+
 func (t *Target) GetRandomAddr() string{
-     atomic.StoreInt64(&t.index, t.index+1)
-     return t.TargetAddrs[t.index%int64(len(t.TargetAddrs))]
+	offset := atomic.AddUint32(&t.offset, 1) - 1
+	return t.TargetAddrs[offset%uint32(len(t.TargetAddrs))]
+
 }

@@ -1,12 +1,14 @@
 package server
 
 import (
+	"encoding/binary"
 	"fmt"
 	"goproxy/file"
 	"goproxy/log"
 	"goproxy/mux/mux_link"
 	"goproxy/mux/mux_msg"
 	"goproxy/mux/mux_net"
+	"io"
 	"net"
 	"strconv"
 )
@@ -14,6 +16,8 @@ import (
 type Server struct {
 	cm mux_net.ConnManager
 	address string
+	plexer *mux_link.MultiPlexer
+	taskDb   *file.Db
 }
 var defaultServer Server
 
@@ -21,6 +25,7 @@ var defaultServer Server
 func StartServer(address string) {
 	var err error
 	defaultServer.address = address
+	LoadTaskJob()
 	listener,err := net.Listen("tcp", address)
 	if err != nil {
 		panic(err)
@@ -63,7 +68,9 @@ func handleConnection(conn mux_net.Connection) {
 			conn.SendMsg(mux_msg.MSG_LOG_INFO, "this is a first logging message")
 			conn.SendMsg(mux_msg.MSG_LOG_INFO, "this is second message")
 		case mux_link.TranMode:
-			transConn(conn)
+			defaultServer.plexer = mux_link.NewMultiPlexer(conn.GetConn())
+			conn.Plexer = defaultServer.plexer
+			go transConn(conn)
 
 
 	}
@@ -73,18 +80,56 @@ func handleConnection(conn mux_net.Connection) {
 
 func transConn(conn mux_net.Connection) {
 
-	taskDb := file.LoadTask()
-	plexer := mux_link.NewMultiPlexer(conn.GetConn())
-	for _, task := range taskDb.Tasks {
-		conn.Target.TargetAddrs = task.TargetAddrs
-		targetAddr := conn.Target.GetRandomAddr()
-		go listenOuterConn(task,targetAddr , plexer)
-		break
+	for {
+		msgType ,err := conn.ReadMsgType()
+		if err != nil {
+			conn.Close()
+			return
+		}
+		switch msgType{
+			case mux_msg.MSG_TRAN_INFO:
+				log.Info("accept msg_tran_info")
+				Unpack(conn)
+
+		}
 	}
 
 }
 
-func listenOuterConn (task file.Task,targetAddr string, plexer *mux_link.MultiPlexer) {
+
+func Unpack(conn mux_net.Connection) {
+	var buf = make([]byte, 4)
+	io.ReadFull(&conn, buf)
+	var connId uint32
+	connId = binary.LittleEndian.Uint32(buf)
+	linkConn := conn.Plexer.GetConnById(int(connId))
+	io.ReadFull(&conn, buf)
+	var messagelen uint32
+	messagelen = binary.LittleEndian.Uint32(buf)
+	log.Infof("New messagelen : %d", messagelen)
+	var message = make([]byte, messagelen)
+	io.ReadFull(&conn, message)
+	linkConn.ReceiveWindowWrite(message)
+	return
+}
+
+func LoadTaskJob() {
+	taskDb := file.LoadTask()
+	defaultServer.taskDb = taskDb
+	for _, task := range taskDb.Tasks {
+		go listenOuterConn(task, ProxyTcpConnect)
+		break
+	}
+}
+func ProxyTcpConnect(proxyconn net.Conn, task file.Task) {
+	plexerConn := mux_link.NewConn(defaultServer.plexer)
+	defaultServer.plexer.AddConn(plexerConn)
+	target := mux_net.Target{TargetAddrs: task.TargetAddrs}
+	plexerConn.SendLinkInfo(target.GetRandomAddr())
+	mux_link.Copy(proxyconn, plexerConn)
+}
+
+func listenOuterConn (task file.Task,f func(net.Conn, file.Task) ) {
 	l, err := net.Listen("tcp", ":"+strconv.Itoa(task.Port))
 	log.Info(fmt.Sprintf("New Task Listen port : %d", task.Port))
 	if err != nil {
@@ -98,10 +143,6 @@ func listenOuterConn (task file.Task,targetAddr string, plexer *mux_link.MultiPl
 			log.Error(err.Error())
 			netconn.Close()
 		}
-		linkconn := mux_link.NewConn(plexer)
-		plexer.AddConn(&linkconn)
-		fmt.Println(linkconn)
-		linkconn.SendLinkInfo(targetAddr)
-		mux_link.Copy(netconn, &linkconn)
+		go f(netconn,task)
 	}
 }

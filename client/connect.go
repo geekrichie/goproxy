@@ -88,7 +88,7 @@ func dealNewTaskConn(conn mux_net.Connection) {
 	connId = binary.LittleEndian.Uint32(buf)
 	linkConn.SetConnId(int(connId))
 	log.Infof("New conn Id : %d", connId)
-	conn.Plexer.AddConn(&linkConn)
+	conn.Plexer.AddConn(linkConn)
 
 	io.ReadFull(&conn, buf)
 	var messagelen uint32
@@ -96,13 +96,13 @@ func dealNewTaskConn(conn mux_net.Connection) {
 	log.Infof("New messagelen : %d", messagelen)
 	var linkinfo = make([]byte, messagelen)
 	io.ReadFull(&conn, linkinfo)
-	fmt.Printf("%#v", linkConn)
+
 	c, err := net.DialTimeout("tcp", string(linkinfo), time.Millisecond*200)
 	if err != nil {
 		log.Errorf("dial %s error", string(linkinfo))
 	}
 
-	mux_link.Copy(c, &linkConn)
+	mux_link.Copy(c, linkConn)
 
 }
 

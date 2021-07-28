@@ -1,7 +1,6 @@
 package mux_link
 
 import (
-	"fmt"
 	"goproxy/log"
 	"goproxy/mux/mux_msg"
 	"goproxy/mux/mux_queue"
@@ -54,11 +53,11 @@ func NewMultiPlexer(netconn net.Conn) *MultiPlexer {
 	}
 }
 
-func (m MultiPlexer) AddConn(conn *conn) {
+func (m *MultiPlexer) AddConn(conn *conn) {
 	m.L.Lock()
 	defer m.L.Unlock()
 	conn.connId = m.connNum
-	conn.plexer = &m
+	conn.plexer = m
 	m.connNum  = m.connNum + 1
 	m.conns[conn.connId] = *conn
 }
@@ -67,8 +66,15 @@ func (m *MultiPlexer)GetConnById(connId int) conn{
 	return m.conns[connId]
 }
 
-func NewConn(plexer *MultiPlexer) conn{
-	return conn{
+func (m *MultiPlexer) Write(data []byte)(n int, err error) {
+	return m.netconn.Write(data)
+}
+func (m *MultiPlexer) Read(data []byte)(n int, err error) {
+	return m.netconn.Read(data)
+}
+
+func NewConn(plexer *MultiPlexer) *conn{
+	return &conn{
 		receiveWindow: *NewReceiveWindow(),
 		sendWindow: sendWindow{plexer: plexer},
 	}
@@ -79,11 +85,10 @@ func (c *conn) SendLinkInfo(targetaddr string) {
 	msgConnInfo := mux_msg.SyncMsgConnInfoPool.Get().(*mux_msg.MsgConnInfo)
 	msgConnInfo.SetMessage(mux_msg.MSG_LINK_INFO, int32(c.connId), targetaddr)
 	buf, err := msgConnInfo.Pack()
-	fmt.Println(buf)
 	if err != nil {
 		log.Error(err.Error())
 	}
-	_, err = c.sendWindow.plexer.netconn.Write(buf)
+	_, err = c.sendWindow.plexer.Write(buf)
 	if err != nil {
 		log.Error(err.Error())
 	}
