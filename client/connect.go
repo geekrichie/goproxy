@@ -54,10 +54,10 @@ func handleTranConnect(conn mux_net.Connection) {
 		}
 		switch msgType{
 		case mux_msg.MSG_LINK_INFO:
-			log.Info("accept msg_link_info")
+			//log.Info("accept msg_link_info")
 			dealNewTaskConn(conn)
 		case mux_msg.MSG_TRAN_INFO:
-			log.Info("accept msg_tran_info")
+			//log.Info("accept msg_tran_info")
 			Unpack(conn)
 		}
 	}
@@ -72,7 +72,7 @@ func Unpack(conn mux_net.Connection) {
 	io.ReadFull(&conn, buf)
 	var messagelen uint32
 	messagelen = binary.LittleEndian.Uint32(buf)
-	log.Infof("New messagelen : %d", messagelen)
+	//log.Infof("New messagelen : %d", messagelen)
 	var message = make([]byte, messagelen)
 	io.ReadFull(&conn, message)
 	linkConn.ReceiveWindowWrite(message)
@@ -87,13 +87,13 @@ func dealNewTaskConn(conn mux_net.Connection) {
 	var connId uint32
 	connId = binary.LittleEndian.Uint32(buf)
 	linkConn.SetConnId(int(connId))
-	log.Infof("New conn Id : %d", connId)
+	//log.Infof("New conn Id : %d", connId)
 	conn.Plexer.AddConn(linkConn)
 
 	io.ReadFull(&conn, buf)
 	var messagelen uint32
 	messagelen = binary.LittleEndian.Uint32(buf)
-	log.Infof("New messagelen : %d", messagelen)
+	//log.Infof("New messagelen : %d", messagelen)
 	var linkinfo = make([]byte, messagelen)
 	io.ReadFull(&conn, linkinfo)
 

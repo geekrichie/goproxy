@@ -113,6 +113,9 @@ func Copy(c1 , c2 net.Conn) {
 				c2.Write(buf[:n1])
 			}else {
 				log.Error(err1.Error())
+				//发生错误两端关闭
+				c1.Close()
+				c2.Close()
 				break
 			}
 		}
@@ -124,6 +127,9 @@ func Copy(c1 , c2 net.Conn) {
 				c1.Write(buf[:n2])
 			} else {
 				log.Error(err2.Error())
+				//发生错误两端关闭
+				c1.Close()
+				c2.Close()
 				break
 			}
 		}
@@ -148,6 +154,7 @@ func (c *conn) Read(data []byte) (n int, err error) {
 }
 func (c *conn) Close() error {
 	//todo 关闭连接
+	//这里会先关闭连接，然后通知对方关闭
 	return nil
 }
 

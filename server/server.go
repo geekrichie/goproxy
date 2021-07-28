@@ -88,7 +88,7 @@ func transConn(conn mux_net.Connection) {
 		}
 		switch msgType{
 			case mux_msg.MSG_TRAN_INFO:
-				log.Info("accept msg_tran_info")
+				//log.Info("accept msg_tran_info")
 				Unpack(conn)
 
 		}
@@ -106,7 +106,7 @@ func Unpack(conn mux_net.Connection) {
 	io.ReadFull(&conn, buf)
 	var messagelen uint32
 	messagelen = binary.LittleEndian.Uint32(buf)
-	log.Infof("New messagelen : %d", messagelen)
+	//log.Infof("New messagelen : %d", messagelen)
 	var message = make([]byte, messagelen)
 	io.ReadFull(&conn, message)
 	linkConn.ReceiveWindowWrite(message)
@@ -118,7 +118,6 @@ func LoadTaskJob() {
 	defaultServer.taskDb = taskDb
 	for _, task := range taskDb.Tasks {
 		go listenOuterConn(task, ProxyTcpConnect)
-		break
 	}
 }
 func ProxyTcpConnect(proxyconn net.Conn, task file.Task) {
