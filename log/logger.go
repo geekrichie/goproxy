@@ -1,6 +1,9 @@
 package log
 
-import log "github.com/amoghe/distillog"
+import (
+	log "github.com/amoghe/distillog"
+	"runtime"
+)
 
 func Info(msg string) {
      log.Infoln(msg)
@@ -27,7 +30,8 @@ func Warningf(msg string, v ...interface{}) {
 }
 
 func Error(msg string) {
-	log.Errorln(msg)
+	pc, file, line ,_ := runtime.Caller(1)
+	log.Errorln(runtime.FuncForPC(pc).Name(),file, line ,msg)
 }
 
 func Errorf(msg string, v ...interface{}) {

@@ -178,6 +178,28 @@ func (c *Connection) SendMsg(msgType uint8, message string) {
 	}
 }
 
+func Unpack(conn Connection, msgType uint8) {
+	var buf = make([]byte, 4)
+	io.ReadFull(&conn, buf)
+	var connId uint32
+	connId = binary.LittleEndian.Uint32(buf)
+	linkConn := conn.Plexer.GetConnById(int(connId))
+	if msgType == mux_msg.MSG_CLOSE_CONN {
+		if linkConn.GetConnId() != 0 {
+			linkConn.Close()
+		}
+		return
+	}
+	io.ReadFull(&conn, buf)
+	var messagelen uint32
+	messagelen = binary.LittleEndian.Uint32(buf)
+	//log.Infof("New messagelen : %d", messagelen)
+	var message = make([]byte, messagelen)
+	io.ReadFull(&conn, message)
+	linkConn.ReceiveWindowWrite(message)
+	return
+}
+
 /**
  kafka-go balance.go 中的轮询实现
  */

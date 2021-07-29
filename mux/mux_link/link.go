@@ -30,6 +30,8 @@ type conn struct {
 	plexer *MultiPlexer
 	receiveWindow receiveWindow
 	sendWindow sendWindow
+	isClose bool
+	once sync.Once
 }
 
 func (c *conn) SetDeadline(t time.Time) error {
@@ -56,10 +58,20 @@ func NewMultiPlexer(netconn net.Conn) *MultiPlexer {
 func (m *MultiPlexer) AddConn(conn *conn) {
 	m.L.Lock()
 	defer m.L.Unlock()
+	m.connNum  = m.connNum + 1
 	conn.connId = m.connNum
 	conn.plexer = m
-	m.connNum  = m.connNum + 1
 	m.conns[conn.connId] = *conn
+}
+
+func (m *MultiPlexer) RemoveConn(conn *conn) {
+	m.L.Lock()
+	defer m.L.Unlock()
+	if _,ok := m.conns[conn.connId]; ok {
+		delete(m.conns,conn.connId)
+		m.connNum = m.connNum - 1
+		conn.plexer = nil
+	}
 }
 
 func (m *MultiPlexer)GetConnById(connId int) conn{
@@ -82,8 +94,13 @@ func NewConn(plexer *MultiPlexer) *conn{
 
 func (c *conn) SendLinkInfo(targetaddr string) {
 	//这里1个字节的类型标识，4个字节的长度，后面接具体的连接信息
+	c.SendInfo(mux_msg.MSG_LINK_INFO, targetaddr)
+}
+
+func (c *conn) SendInfo(flag uint8, message string) {
+	//这里1个字节的类型标识，4个字节的长度，后面接具体的连接信息
 	msgConnInfo := mux_msg.SyncMsgConnInfoPool.Get().(*mux_msg.MsgConnInfo)
-	msgConnInfo.SetMessage(mux_msg.MSG_LINK_INFO, int32(c.connId), targetaddr)
+	msgConnInfo.SetMessage(flag, int32(c.connId), message)
 	buf, err := msgConnInfo.Pack()
 	if err != nil {
 		log.Error(err.Error())
@@ -94,15 +111,6 @@ func (c *conn) SendLinkInfo(targetaddr string) {
 	}
 }
 
-func (c *conn)AcceptLink() {
-	//buf := make([]byte, 4)
-	//_, _ = io.ReadFull(c,buf)
-	//var connId uint32
-	//binary.LittleEndian.PutUint32(buf, connId)
-	//c.connId = int(connId)
-	//_, _ = io.ReadFull(c,buf)
-
-}
 
 func Copy(c1 , c2 net.Conn) {
 	buf := make([]byte,32*1024)
@@ -155,6 +163,11 @@ func (c *conn) Read(data []byte) (n int, err error) {
 func (c *conn) Close() error {
 	//todo 关闭连接
 	//这里会先关闭连接，然后通知对方关闭
+	c.once.Do(func() {
+		 c.isClose = true
+		 c.SendInfo(mux_msg.MSG_CLOSE_CONN,"")
+		 c.plexer.RemoveConn(c)
+	})
 	return nil
 }
 
@@ -182,6 +195,7 @@ type receiveWindow struct {
 	maxWindowsize int
 	plexer MultiPlexer
 }
+//todo windowSize 不知道怎么为负数了
 
 func NewReceiveWindow() *receiveWindow{
 	 return &receiveWindow{

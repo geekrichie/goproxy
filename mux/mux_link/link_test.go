@@ -48,5 +48,8 @@ func TestReceiveWindow_Read(t *testing.T) {
 }
 
 func TestSlice(t *testing.T) {
-
+	var plexer = &MultiPlexer{}
+    var conn = NewConn(plexer)
+    conn.Close()
+    conn.Close()
 }

@@ -11,6 +11,7 @@ const (
 	MSG_LOG_INFO
 	MSG_LINK_INFO
 	MSG_TRAN_INFO
+	MSG_CLOSE_CONN
 )
 
 type MsgInfo struct {
@@ -71,6 +72,10 @@ func (m *MsgConnInfo)Pack() ([]byte, error ){
 	err = binary.Write(&buf, binary.LittleEndian, m.connId)
 	if err != nil{
 		return nil,err
+	}
+	//这种类型的消息不包含message
+	if m.msgType == MSG_CLOSE_CONN{
+		return buf.Bytes(), nil
 	}
 	err = binary.Write(&buf, binary.LittleEndian, m.messagelen)
 	if err != nil{

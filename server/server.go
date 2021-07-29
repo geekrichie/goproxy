@@ -1,14 +1,12 @@
 package server
 
 import (
-	"encoding/binary"
 	"fmt"
 	"goproxy/file"
 	"goproxy/log"
 	"goproxy/mux/mux_link"
 	"goproxy/mux/mux_msg"
 	"goproxy/mux/mux_net"
-	"io"
 	"net"
 	"strconv"
 )
@@ -89,7 +87,9 @@ func transConn(conn mux_net.Connection) {
 		switch msgType{
 			case mux_msg.MSG_TRAN_INFO:
 				//log.Info("accept msg_tran_info")
-				Unpack(conn)
+				mux_net.Unpack(conn,msgType)
+			case mux_msg.MSG_CLOSE_CONN:
+				mux_net.Unpack(conn, mux_msg.MSG_CLOSE_CONN)
 
 		}
 	}
@@ -97,21 +97,6 @@ func transConn(conn mux_net.Connection) {
 }
 
 
-func Unpack(conn mux_net.Connection) {
-	var buf = make([]byte, 4)
-	io.ReadFull(&conn, buf)
-	var connId uint32
-	connId = binary.LittleEndian.Uint32(buf)
-	linkConn := conn.Plexer.GetConnById(int(connId))
-	io.ReadFull(&conn, buf)
-	var messagelen uint32
-	messagelen = binary.LittleEndian.Uint32(buf)
-	//log.Infof("New messagelen : %d", messagelen)
-	var message = make([]byte, messagelen)
-	io.ReadFull(&conn, message)
-	linkConn.ReceiveWindowWrite(message)
-	return
-}
 
 func LoadTaskJob() {
 	taskDb := file.LoadTask()
