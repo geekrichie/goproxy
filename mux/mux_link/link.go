@@ -6,7 +6,9 @@ import (
 	"goproxy/mux/mux_queue"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
+	"unsafe"
 )
 
 const (
@@ -20,7 +22,7 @@ const (
 
 type MultiPlexer struct {
 	connNum int
-	conns  map[int]conn
+	conns  map[int]*conn
 	L sync.Mutex
 	netconn net.Conn
 }
@@ -49,7 +51,7 @@ func (c *conn) SetWriteDeadline(t time.Time) error {
 func NewMultiPlexer(netconn net.Conn) *MultiPlexer {
 	return &MultiPlexer{
 		connNum: 0,
-		conns : make(map[int]conn),
+		conns : make(map[int]*conn),
 		netconn: netconn,
 		L : sync.Mutex{},
 	}
@@ -61,7 +63,7 @@ func (m *MultiPlexer) AddConn(conn *conn) {
 	m.connNum  = m.connNum + 1
 	conn.connId = m.connNum
 	conn.plexer = m
-	m.conns[conn.connId] = *conn
+	m.conns[conn.connId] = conn
 }
 
 func (m *MultiPlexer) RemoveConn(conn *conn) {
@@ -74,7 +76,7 @@ func (m *MultiPlexer) RemoveConn(conn *conn) {
 	}
 }
 
-func (m *MultiPlexer)GetConnById(connId int) conn{
+func (m *MultiPlexer)GetConnById(connId int) *conn{
 	return m.conns[connId]
 }
 
@@ -214,7 +216,8 @@ func (rw *receiveWindow) Write(b []byte)(n int, err error) {
 		time.Sleep(time.Millisecond * 5)
 		goto start
 	}
-	rw.windowSize += len(b)
+	atomic.StoreInt32((*int32)(unsafe.Pointer(&rw.windowSize)), int32(rw.windowSize+len(b)))
+	//log.Info(fmt.Sprintf(" write receive window size : %d", rw.windowSize))
 	listelem := syncListPool.Get().(*ListElement)
 	listelem.Buf = b
 	listelem.L = len(b)
@@ -272,7 +275,10 @@ func (rw *receiveWindow) Read(b []byte)(int, error)  {
 			break
 		}
 	}
-	rw.windowSize -= off
+	//log.Info(fmt.Sprintf("read before receive window size : %d", rw.windowSize))
+	//rw.windowSize -= off
+	atomic.StoreInt32((*int32)(unsafe.Pointer(&rw.windowSize)), int32(rw.windowSize-off))
+	//log.Info(fmt.Sprintf("read receive window size : %d", rw.windowSize))
 	return off, err
 }
 

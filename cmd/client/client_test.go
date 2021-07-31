@@ -3,16 +3,33 @@ package main
 import (
 	"encoding/binary"
 	"fmt"
-	"net"
 	"testing"
 )
 
+type structa struct {
+	b *structb
+}
+type structb struct {
+	 Num int
+}
+
+func (b *structb ) Add () {
+	b.Num = b.Num +1
+}
+
 func Test_Net(t *testing.T) {
-	conn, err := net.Dial("tcp",":9998")
-	if err != nil {
-		t.Log(err)
-	}
-	conn.Write([]byte("hello"))
+	//conn, err := net.Dial("tcp",":9998")
+	//if err != nil {
+	//	t.Log(err)
+	//}
+	//conn.Write([]byte("hello"))
+	var c = structa{}
+	var d = structb{}
+	c.b = &d
+	var a = c
+	c.b.Add()
+	c.b.Add()
+	fmt.Println(a.b.Num)
 }
 
 
